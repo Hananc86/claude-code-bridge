@@ -17,6 +17,7 @@ Usage:
 Options:
   --port <n>              HTTP port for the local bridge (default: 8091)
   --host <ip>             Bind address (default: 127.0.0.1)
+  --token <secret>        Bridge password (use the same in the extension). Auto-generated if omitted.
   --cwd <path>            Default working directory for Claude (default: current dir)
   --claude-bin <path>     Path to claude CLI binary (default: auto-detect)
   --timeout <seconds>     Max time for a single Claude call (default: 7200)
@@ -24,7 +25,7 @@ Options:
 Relay options (connect to a remote relay server):
   --relay-url <url>       WebSocket URL of the relay server
   --machine <name>        Machine name for the relay
-  --token <bearer>        Machine bearer token
+  --token <bearer>        Machine bearer token (when using relay, --token is the relay auth)
   --cf-id <id>            Cloudflare Access Client ID (optional)
   --cf-secret <secret>    Cloudflare Access Client Secret (optional)
 
@@ -80,9 +81,12 @@ function main() {
       } : null,
     };
 
-    // Generate a random local bearer token for bridge ↔ relay-client auth
     const crypto = require("node:crypto");
-    config.bearerToken = crypto.randomBytes(32).toString("hex");
+    if (config.relay) {
+      config.bearerToken = crypto.randomBytes(32).toString("hex");
+    } else {
+      config.bearerToken = values.token || crypto.randomBytes(32).toString("hex");
+    }
 
     run(config);
   } else if (command === "install-service") {
