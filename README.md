@@ -1,11 +1,11 @@
-# claude-code-bridge
+# claude-bridge-cli
 
 Use Claude Code from your browser. Runs a local server that connects your browser tools to the Claude CLI on your machine.
 
 ## Install
 
 ```bash
-npm install -g claude-code-bridge
+npm install -g claude-bridge-cli
 ```
 
 Requires Node.js 18+ and [Claude Code CLI](https://www.npmjs.com/package/@anthropic-ai/claude-code) installed.
@@ -15,7 +15,7 @@ Requires Node.js 18+ and [Claude Code CLI](https://www.npmjs.com/package/@anthro
 ### Local mode (same machine)
 
 ```bash
-claude-code-bridge start --port 8091
+claude-bridge-cli start --port 8091
 ```
 
 Starts an HTTP server on `127.0.0.1:8091` wrapping `claude -p`. Send prompts via `POST /ask`.
@@ -23,7 +23,7 @@ Starts an HTTP server on `127.0.0.1:8091` wrapping `claude -p`. Send prompts via
 ### Relay mode (remote access)
 
 ```bash
-claude-code-bridge start \
+claude-bridge-cli start \
   --relay-url wss://your-relay-server.example.com/agent/ws \
   --machine my-laptop \
   --token <your-machine-bearer>
@@ -34,7 +34,7 @@ Connect to Claude on this machine from another device (requires a relay server).
 ### Auto-start on boot
 
 ```bash
-claude-code-bridge install-service --relay-url ... --machine ... --token ...
+claude-bridge-cli install-service --relay-url ... --machine ... --token ...
 ```
 
 Registers as a system service (Windows Scheduled Task / macOS LaunchAgent / Linux systemd user unit).

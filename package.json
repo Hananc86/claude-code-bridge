@@ -1,15 +1,21 @@
 {
-  "name": "claude-code-bridge",
+  "name": "claude-bridge-cli",
   "version": "1.0.0",
   "description": "Use Claude Code from your browser. Runs a local server that connects your browser tools to the Claude CLI.",
   "main": "lib/bridge.js",
   "bin": {
-    "claude-code-bridge": "bin/cli.js"
+    "claude-bridge-cli": "bin/cli.js"
   },
   "scripts": {
     "start": "node bin/cli.js start"
   },
-  "keywords": ["claude", "cli", "bridge", "relay", "websocket"],
+  "keywords": [
+    "claude",
+    "cli",
+    "bridge",
+    "relay",
+    "websocket"
+  ],
   "license": "MIT",
   "dependencies": {
     "ws": "^8.18.0"
