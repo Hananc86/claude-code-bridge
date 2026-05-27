@@ -1,6 +1,6 @@
 {
   "name": "claude-bridge-cli",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Use Claude Code from your browser. Runs a local server that connects your browser tools to the Claude CLI.",
   "main": "lib/bridge.js",
   "bin": {

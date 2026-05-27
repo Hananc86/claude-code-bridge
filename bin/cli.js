@@ -117,6 +117,10 @@ async function run(config) {
   // Start bridge HTTP server
   const bridge = await startBridge(config);
   console.log(`[bridge] Bridge ready on http://${config.host}:${config.port}`);
+  if (!config.relay) {
+    console.log(`[bridge] Bearer token: ${config.bearerToken}`);
+    console.log(`[bridge] Use this token when adding the endpoint in the extension.`);
+  }
 
   // Start relay client if configured
   if (config.relay) {
