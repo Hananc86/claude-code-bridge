@@ -1,6 +1,6 @@
 # claude-code-bridge
 
-A lightweight bridge that exposes [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code) (`claude -p`) over HTTP, with optional WebSocket relay support for remote access.
+Use Claude Code from your browser. Runs a local server that connects your browser tools to the Claude CLI on your machine.
 
 ## Install
 
@@ -29,7 +29,7 @@ claude-code-bridge start \
   --token <your-machine-bearer>
 ```
 
-Connects to a relay server via WebSocket, making this machine reachable from any browser.
+Connect to Claude on this machine from another device (requires a relay server).
 
 ### Auto-start on boot
 
