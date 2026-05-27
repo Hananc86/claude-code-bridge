@@ -107,10 +107,15 @@ async function run(config) {
   if (!config.claudeBin) {
     const { execSync } = require("node:child_process");
     try {
-      config.claudeBin = execSync(
+      const lines = execSync(
         process.platform === "win32" ? "where claude" : "which claude",
         { encoding: "utf8" }
-      ).trim().split("\n")[0];
+      ).trim().split(/\r?\n/);
+      if (process.platform === "win32") {
+        config.claudeBin = lines.find(l => l.endsWith(".cmd")) || lines[0];
+      } else {
+        config.claudeBin = lines[0];
+      }
     } catch {
       console.error("[bridge] ERROR: claude CLI not found. Install it: npm install -g @anthropic-ai/claude-code");
       process.exit(1);
