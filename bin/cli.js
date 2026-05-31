@@ -128,12 +128,11 @@ Options:
 Relay options (connect to a remote relay server):
   --relay-url <url>       WebSocket URL of the relay server
   --machine <name>        Machine name for the relay
-  --token <bearer>        Machine bearer (optional — if omitted, the CLI starts
-                          a browser-OTP pair flow and caches the bearer at
-                          ~/.claude-bridge/auth.json for next time)
-  --ephemeral             Pair on every start, never read/write auth.json.
-                          Forces a fresh browser-OTP each launch — use on
-                          machines you don't want to leave any saved bearer on.
+  --token <bearer>        Machine bearer (skips both auth.json and pair flow)
+  --save-auth             Cache the bearer in ~/.claude-bridge/auth.json so the
+                          next start reuses it. Required for unattended /
+                          systemd-service installs. WITHOUT this flag the CLI
+                          re-pairs (browser OTP) on every start — the default.
   --cf-id <id>            Cloudflare Access Client ID (optional)
   --cf-secret <secret>    Cloudflare Access Client Secret (optional)
 
@@ -141,7 +140,9 @@ Environment variables:
   All options can be set via env vars with BRIDGE_ prefix:
   BRIDGE_PORT, BRIDGE_HOST, BRIDGE_CWD, BRIDGE_TIMEOUT,
   BRIDGE_RELAY_URL, BRIDGE_MACHINE_NAME, BRIDGE_MACHINE_TOKEN,
-  BRIDGE_EPHEMERAL=1 (force fresh pair every start, no saved bearer),
+  BRIDGE_SAVE_AUTH=1 (cache the bearer to ~/.claude-bridge/auth.json
+                       for unattended restarts; default re-pairs every
+                       start so nothing is persisted),
   BRIDGE_CF_ID, BRIDGE_CF_SECRET
 `;
 
@@ -169,7 +170,8 @@ function main() {
         "relay-url":  { type: "string", default: env("RELAY_URL", "") },
         machine:    { type: "string", default: env("MACHINE_NAME", "") },
         token:      { type: "string", default: env("MACHINE_TOKEN", "") },
-        ephemeral:  { type: "boolean", default: env("EPHEMERAL", "") === "1" },
+        "save-auth":{ type: "boolean", default: env("SAVE_AUTH", "") === "1" },
+        ephemeral:  { type: "boolean", default: false },  // deprecated, now default behavior — kept as a no-op for compatibility
         "cf-id":    { type: "string", default: env("CF_ID", "") },
         "cf-secret": { type: "string", default: env("CF_SECRET", "") },
       },
@@ -186,7 +188,10 @@ function main() {
         url: values["relay-url"],
         machine: values.machine,
         token: values.token,
-        ephemeral: !!values.ephemeral,
+        // Default = ephemeral (pair on every start, never persist). Opt in
+        // to caching with --save-auth when running unattended / as a service.
+        // The legacy --ephemeral flag is a no-op (kept for back-compat).
+        saveAuth: !!values["save-auth"],
         cfId: values["cf-id"],
         cfSecret: values["cf-secret"],
       } : null,
@@ -250,19 +255,22 @@ async function run(config) {
     }
     // Resolve a bearer:
     //   --token            → use it directly (never look at auth.json)
-    //   --ephemeral        → always pair fresh, never read or write auth.json
-    //   default            → saved auth.json → fall back to pair flow on miss
+    //   --save-auth        → reuse saved auth.json; pair only if no entry exists
+    //   default (no flags) → pair fresh on every start, never read or write
+    //                        auth.json (most secure; requires user at the
+    //                        keyboard for every launch)
     if (!config.relay.token) {
-      const saved = config.relay.ephemeral
-        ? null
-        : lookupSavedBearer(config.relay.url, config.relay.machine);
+      const saved = config.relay.saveAuth
+        ? lookupSavedBearer(config.relay.url, config.relay.machine)
+        : null;
       if (saved) {
         config.relay.token = saved;
         console.log(`[bridge] Using saved bearer from ${authFilePath()}`);
       } else {
         try {
+          // ephemeral == NOT saveAuth: don't write back when pair completes.
           config.relay.token = await pairInteractive(
-            config.relay.url, config.relay.machine, config.relay.ephemeral
+            config.relay.url, config.relay.machine, /* ephemeral */ !config.relay.saveAuth
           );
         } catch (e) {
           console.error(`[bridge] ERROR: ${e.message}`);
