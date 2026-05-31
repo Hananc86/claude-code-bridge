@@ -2,8 +2,107 @@
 "use strict";
 
 const { parseArgs } = require("node:util");
+const fs = require("node:fs");
+const path = require("node:path");
+const os = require("node:os");
 const { startBridge } = require("../lib/bridge");
 const { startRelay } = require("../lib/relay-client");
+
+// ── Pair flow (browser-OTP based auth) ────────────────────────────────────
+// When --token isn't supplied, the CLI:
+//   1. POSTs /pair-cli/start to the relay's HTTP base (public endpoint)
+//   2. Prints the short code + pair URL — user opens it, OTPs into CF Access,
+//      confirms in the browser
+//   3. Long-polls /pair-cli/claim until the bearer arrives
+//   4. Saves the bearer to ~/.claude-bridge/auth.json so subsequent starts
+//      pick it up automatically
+// Replaces the old workflow of running `claude-relay-ctl provision <m>` on
+// the host and copy-pasting a long bearer onto the CLI command line.
+
+function authFilePath() {
+  return path.join(os.homedir(), ".claude-bridge", "auth.json");
+}
+
+function readAuthFile() {
+  try { return JSON.parse(fs.readFileSync(authFilePath(), "utf8")); }
+  catch { return { bearers: {} }; }
+}
+
+function writeAuthFile(data) {
+  const fp = authFilePath();
+  fs.mkdirSync(path.dirname(fp), { recursive: true });
+  fs.writeFileSync(fp, JSON.stringify(data, null, 2), { mode: 0o600 });
+}
+
+function relayHttpBase(wsUrl) {
+  // wss://host/agent/ws → https://host
+  const u = new URL(wsUrl);
+  const proto = u.protocol === "wss:" ? "https:" : "http:";
+  return `${proto}//${u.host}`;
+}
+
+async function pairInteractive(relayWsUrl, machine) {
+  const base = relayHttpBase(relayWsUrl);
+  process.stdout.write(`[bridge] Starting pair flow for "${machine}" against ${base}\n`);
+
+  const startResp = await fetch(`${base}/pair-cli/start`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ machine }),
+  });
+  if (!startResp.ok) {
+    const text = await startResp.text();
+    throw new Error(`pair start failed (${startResp.status}): ${text}`);
+  }
+  const { code, poll_token, pair_url, expires_in } = await startResp.json();
+
+  console.log("\n  ┌─────────────────────────────────────────────────┐");
+  console.log("  │  Open this URL in a browser to pair the device  │");
+  console.log("  ├─────────────────────────────────────────────────┤");
+  console.log(`  │  ${pair_url.padEnd(47)} │`);
+  console.log("  │                                                 │");
+  console.log(`  │  Confirm this code matches:  ${code.padEnd(17)}│`);
+  console.log("  └─────────────────────────────────────────────────┘");
+  console.log(`  Code expires in ${expires_in}s. Waiting for confirmation…\n`);
+
+  const deadline = Date.now() + expires_in * 1000;
+  while (Date.now() < deadline) {
+    let resp;
+    try {
+      resp = await fetch(`${base}/pair-cli/claim`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ poll_token }),
+      });
+    } catch (e) {
+      await new Promise(r => setTimeout(r, 2000));
+      continue;
+    }
+    if (resp.status === 202) continue;      // still waiting, re-poll
+    if (resp.status === 404 || resp.status === 410) {
+      throw new Error("pair expired or invalidated — re-run to start over");
+    }
+    if (!resp.ok) {
+      const text = await resp.text();
+      throw new Error(`pair claim failed (${resp.status}): ${text}`);
+    }
+    const { bearer, machine: confirmed } = await resp.json();
+    console.log(`[bridge] ✓ Paired as "${confirmed}". Bearer saved to ${authFilePath()}`);
+
+    const auth = readAuthFile();
+    auth.bearers = auth.bearers || {};
+    auth.bearers[base] = auth.bearers[base] || {};
+    auth.bearers[base][confirmed] = bearer;
+    writeAuthFile(auth);
+    return bearer;
+  }
+  throw new Error("pair window expired — re-run to start over");
+}
+
+function lookupSavedBearer(relayWsUrl, machine) {
+  const auth = readAuthFile();
+  return auth.bearers?.[relayHttpBase(relayWsUrl)]?.[machine] || null;
+}
 
 const HELP = `
 claude-code-bridge — Bridge server for Claude Code CLI
@@ -25,7 +124,9 @@ Options:
 Relay options (connect to a remote relay server):
   --relay-url <url>       WebSocket URL of the relay server
   --machine <name>        Machine name for the relay
-  --token <bearer>        Machine bearer token (when using relay, --token is the relay auth)
+  --token <bearer>        Machine bearer (optional — if omitted, the CLI starts
+                          a browser-OTP pair flow and caches the bearer at
+                          ~/.claude-bridge/auth.json for next time)
   --cf-id <id>            Cloudflare Access Client ID (optional)
   --cf-secret <secret>    Cloudflare Access Client Secret (optional)
 
@@ -133,9 +234,24 @@ async function run(config) {
 
   // Start relay client if configured
   if (config.relay) {
-    if (!config.relay.machine || !config.relay.token) {
-      console.error("[bridge] ERROR: --machine and --token required when using --relay-url");
+    if (!config.relay.machine) {
+      console.error("[bridge] ERROR: --machine required when using --relay-url");
       process.exit(1);
+    }
+    // Resolve a bearer: --token > saved auth.json > interactive pair flow.
+    if (!config.relay.token) {
+      const saved = lookupSavedBearer(config.relay.url, config.relay.machine);
+      if (saved) {
+        config.relay.token = saved;
+        console.log(`[bridge] Using saved bearer from ${authFilePath()}`);
+      } else {
+        try {
+          config.relay.token = await pairInteractive(config.relay.url, config.relay.machine);
+        } catch (e) {
+          console.error(`[bridge] ERROR: ${e.message}`);
+          process.exit(1);
+        }
+      }
     }
     console.log(`[bridge] Connecting to relay as "${config.relay.machine}"...`);
     startRelay(config);
