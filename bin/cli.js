@@ -41,9 +41,10 @@ function relayHttpBase(wsUrl) {
   return `${proto}//${u.host}`;
 }
 
-async function pairInteractive(relayWsUrl, machine) {
+async function pairInteractive(relayWsUrl, machine, ephemeral) {
   const base = relayHttpBase(relayWsUrl);
   process.stdout.write(`[bridge] Starting pair flow for "${machine}" against ${base}\n`);
+  if (ephemeral) process.stdout.write(`[bridge] Ephemeral mode — bearer will NOT be saved to disk.\n`);
 
   const startResp = await fetch(`${base}/pair-cli/start`, {
     method: "POST",
@@ -87,13 +88,16 @@ async function pairInteractive(relayWsUrl, machine) {
       throw new Error(`pair claim failed (${resp.status}): ${text}`);
     }
     const { bearer, machine: confirmed } = await resp.json();
-    console.log(`[bridge] ✓ Paired as "${confirmed}". Bearer saved to ${authFilePath()}`);
-
-    const auth = readAuthFile();
-    auth.bearers = auth.bearers || {};
-    auth.bearers[base] = auth.bearers[base] || {};
-    auth.bearers[base][confirmed] = bearer;
-    writeAuthFile(auth);
+    if (ephemeral) {
+      console.log(`[bridge] ✓ Paired as "${confirmed}" (in-memory only, nothing written to disk).`);
+    } else {
+      console.log(`[bridge] ✓ Paired as "${confirmed}". Bearer saved to ${authFilePath()}`);
+      const auth = readAuthFile();
+      auth.bearers = auth.bearers || {};
+      auth.bearers[base] = auth.bearers[base] || {};
+      auth.bearers[base][confirmed] = bearer;
+      writeAuthFile(auth);
+    }
     return bearer;
   }
   throw new Error("pair window expired — re-run to start over");
@@ -127,6 +131,9 @@ Relay options (connect to a remote relay server):
   --token <bearer>        Machine bearer (optional — if omitted, the CLI starts
                           a browser-OTP pair flow and caches the bearer at
                           ~/.claude-bridge/auth.json for next time)
+  --ephemeral             Pair on every start, never read/write auth.json.
+                          Forces a fresh browser-OTP each launch — use on
+                          machines you don't want to leave any saved bearer on.
   --cf-id <id>            Cloudflare Access Client ID (optional)
   --cf-secret <secret>    Cloudflare Access Client Secret (optional)
 
@@ -134,6 +141,7 @@ Environment variables:
   All options can be set via env vars with BRIDGE_ prefix:
   BRIDGE_PORT, BRIDGE_HOST, BRIDGE_CWD, BRIDGE_TIMEOUT,
   BRIDGE_RELAY_URL, BRIDGE_MACHINE_NAME, BRIDGE_MACHINE_TOKEN,
+  BRIDGE_EPHEMERAL=1 (force fresh pair every start, no saved bearer),
   BRIDGE_CF_ID, BRIDGE_CF_SECRET
 `;
 
@@ -161,6 +169,7 @@ function main() {
         "relay-url":  { type: "string", default: env("RELAY_URL", "") },
         machine:    { type: "string", default: env("MACHINE_NAME", "") },
         token:      { type: "string", default: env("MACHINE_TOKEN", "") },
+        ephemeral:  { type: "boolean", default: env("EPHEMERAL", "") === "1" },
         "cf-id":    { type: "string", default: env("CF_ID", "") },
         "cf-secret": { type: "string", default: env("CF_SECRET", "") },
       },
@@ -177,6 +186,7 @@ function main() {
         url: values["relay-url"],
         machine: values.machine,
         token: values.token,
+        ephemeral: !!values.ephemeral,
         cfId: values["cf-id"],
         cfSecret: values["cf-secret"],
       } : null,
@@ -238,15 +248,22 @@ async function run(config) {
       console.error("[bridge] ERROR: --machine required when using --relay-url");
       process.exit(1);
     }
-    // Resolve a bearer: --token > saved auth.json > interactive pair flow.
+    // Resolve a bearer:
+    //   --token            → use it directly (never look at auth.json)
+    //   --ephemeral        → always pair fresh, never read or write auth.json
+    //   default            → saved auth.json → fall back to pair flow on miss
     if (!config.relay.token) {
-      const saved = lookupSavedBearer(config.relay.url, config.relay.machine);
+      const saved = config.relay.ephemeral
+        ? null
+        : lookupSavedBearer(config.relay.url, config.relay.machine);
       if (saved) {
         config.relay.token = saved;
         console.log(`[bridge] Using saved bearer from ${authFilePath()}`);
       } else {
         try {
-          config.relay.token = await pairInteractive(config.relay.url, config.relay.machine);
+          config.relay.token = await pairInteractive(
+            config.relay.url, config.relay.machine, config.relay.ephemeral
+          );
         } catch (e) {
           console.error(`[bridge] ERROR: ${e.message}`);
           process.exit(1);
