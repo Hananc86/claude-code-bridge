@@ -116,6 +116,7 @@ Usage:
   claude-code-bridge install-service        Register as a system service (auto-start on boot)
   claude-code-bridge uninstall-service      Remove the system service
   claude-code-bridge --help                 Show this help
+  claude-code-bridge --version               Print the installed version
 
 Options:
   --port <n>              HTTP port for the local bridge (default: 8091)
@@ -152,6 +153,10 @@ function env(key, def) {
 
 function main() {
   const args = process.argv.slice(2);
+  if (args.includes("--version") || args.includes("-v") || args[0] === "version") {
+    console.log(require("../package.json").version);
+    process.exit(0);
+  }
   if (args.includes("--help") || args.includes("-h") || args.length === 0) {
     console.log(HELP);
     process.exit(0);
@@ -216,6 +221,7 @@ function main() {
 }
 
 async function run(config) {
+  console.log(`[bridge] claude-bridge-cli v${require("../package.json").version}`);
   console.log(`[bridge] Starting on http://${config.host}:${config.port}`);
   console.log(`[bridge] Claude CWD: ${config.cwd}`);
 
