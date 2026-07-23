@@ -124,7 +124,7 @@ Options:
   --token <secret>        Bridge password (use the same in the extension). Auto-generated if omitted.
   --cwd <path>            Default working directory for Claude (default: current dir)
   --claude-bin <path>     Path to claude CLI binary (default: auto-detect)
-  --timeout <seconds>     Max time for a single Claude call (default: 7200)
+  --timeout <seconds>     Max time for a single Claude call (default: 10800)
 
 Relay options (connect to a remote relay server):
   --relay-url <url>       WebSocket URL of the relay server
@@ -171,7 +171,7 @@ function main() {
         host:       { type: "string", default: env("HOST", "127.0.0.1") },
         cwd:        { type: "string", default: env("CWD", process.cwd()) },
         "claude-bin": { type: "string", default: env("CLAUDE_BIN", "") },
-        timeout:    { type: "string", default: env("TIMEOUT", "7200") },
+        timeout:    { type: "string", default: env("TIMEOUT", "10800") },
         "relay-url":  { type: "string", default: env("RELAY_URL", "") },
         machine:    { type: "string", default: env("MACHINE_NAME", "") },
         token:      { type: "string", default: env("MACHINE_TOKEN", "") },
