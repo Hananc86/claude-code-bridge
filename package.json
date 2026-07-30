@@ -9,6 +9,14 @@
   "scripts": {
     "start": "node bin/cli.js start"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Hananc86/claude-code-bridge.git"
+  },
+  "files": [
+    "bin/",
+    "lib/"
+  ],
   "keywords": [
     "claude",
     "cli",
