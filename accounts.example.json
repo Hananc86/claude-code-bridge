@@ -1,0 +1,64 @@
+{
+  "_README": [
+    "Copy to ~/.claude-bridge/accounts.json (or point CLAUDE_BRIDGE_ACCOUNTS at it).",
+    "",
+    "Each account is a Claude Code CONFIG DIRECTORY that is already logged in.",
+    "CLAUDE_CONFIG_DIR is the only working credential override, so an account IS",
+    "a config dir. Create one and log into it interactively, once:",
+    "",
+    "    CLAUDE_CONFIG_DIR=~/.claude-acct1 claude auth login",
+    "",
+    "Nothing is copied between machines. Each machine logs itself in, so a",
+    "credential never travels and a machine can only ever hold its own.",
+    "",
+    "mode:",
+    "  work  — only accounts with scope \"local\": this machine's own. Byte-for-",
+    "          byte today's behaviour when exactly one is listed.",
+    "  pool  — local accounts FIRST, then shared ones. The local account has one",
+    "          consumer, so draining it first minimises contention with any other",
+    "          machine by construction: a shared account is reached only when",
+    "          this machine has nothing of its own left.",
+    "",
+    "scope:",
+    "  local  — this machine owns it. No other machine spends its budget.",
+    "  shared — the same Anthropic account is also used elsewhere (e.g. the PVE",
+    "           pool). Routing state is PER MACHINE, so a cap another machine hit",
+    "           is discovered here by one failed turn, not in advance. That one",
+    "           wasted turn is the entire price of not running a distributed",
+    "           lease, which would add a stuck-lease failure mode that does not",
+    "           exist today.",
+    "  (absent) — treated as local. A config written before modes existed",
+    "           describes one machine's own account; reading it as shared would",
+    "           silently enrol it in a pool it was never meant to join.",
+    "",
+    "Delete the _README key or leave it — unknown keys are ignored."
+  ],
+
+  "enabled": true,
+  "mode": "pool",
+
+  "accounts": [
+    {
+      "name": "work",
+      "email": "you@work.example",
+      "config_dir": "/home/you/.claude",
+      "scope": "local",
+      "primary": true,
+      "enabled": true
+    },
+    {
+      "name": "acct1",
+      "email": "shared1@example.com",
+      "config_dir": "/home/you/.claude-acct1",
+      "scope": "shared",
+      "enabled": true
+    },
+    {
+      "name": "acct2",
+      "email": "shared2@example.com",
+      "config_dir": "/home/you/.claude-acct2",
+      "scope": "shared",
+      "enabled": true
+    }
+  ]
+}

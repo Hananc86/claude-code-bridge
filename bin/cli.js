@@ -245,6 +245,30 @@ async function run(config) {
   }
   console.log(`[bridge] Claude CLI: ${config.claudeBin}`);
 
+  // Say out loud whether multi-account routing is ON, and where the file it
+  // wants lives. A feature that is silently off looks identical to one that is
+  // broken — and the whole point of this layer is that a usage cap stops being
+  // a dead end, which nobody can verify from the outside.
+  try {
+    const accounts = require("../lib/accounts");
+    const cfg = accounts.loadConfig();
+    if (cfg.enabled) {
+      const n = cfg.accounts.length;
+      const local = cfg.accounts.filter(a => a.scope === "local").length;
+      console.log(`[bridge] Accounts: ${n} in "${cfg.mode}" mode `
+        + `(${local} local, ${n - local} shared) — ${accounts.CONFIG_PATH()}`);
+      if (cfg.mode === "pool") {
+        console.log(`[bridge] Drain order: ${cfg.accounts.map(a => a.name).join(" → ")}`);
+      }
+    } else {
+      console.log(`[bridge] Accounts: single-account mode (no ${accounts.CONFIG_PATH()}) — `
+        + `a usage limit will surface as an error, with no failover.`);
+    }
+  } catch (e) {
+    console.error(`[bridge] Accounts: could not be read (${e.message}) — `
+      + `continuing on the CLI's own credential.`);
+  }
+
   // Start bridge HTTP server
   const bridge = await startBridge(config);
   console.log(`[bridge] Bridge ready on http://${config.host}:${config.port}`);
