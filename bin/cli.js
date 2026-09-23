@@ -264,6 +264,22 @@ async function run(config) {
       console.log(`[bridge] Accounts: single-account mode (no ${accounts.CONFIG_PATH()}) — `
         + `a usage limit will surface as an error, with no failover.`);
     }
+    // Say at startup which logins are dying. A login lasts about a month and
+    // renewing one needs a human, so the only thing that makes it manageable
+    // is finding out BEFORE something fails — which is exactly what no machine
+    // but the PVE host could do.
+    try {
+      const authFlow = require("../lib/auth");
+      const st = authFlow.listAccounts();
+      if (st.enabled && st.needs_attention > 0) {
+        const bad = st.accounts.filter(a =>
+          !a.readable || ["expired", "expiring", "wiped"].includes(a.state));
+        console.log(`[bridge] ⚠ ${st.needs_attention} login(s) need attention: `
+          + bad.map(a => `${a.name} (${a.state || a.reason}`
+              + (typeof a.days_left === "number" ? `, ${a.days_left}d` : "") + ")").join(", "));
+        console.log(`[bridge]   Renew from the extension, or POST /auth/login/start.`);
+      }
+    } catch (_e) { /* never block a start on a status read */ }
   } catch (e) {
     console.error(`[bridge] Accounts: could not be read (${e.message}) — `
       + `continuing on the CLI's own credential.`);
