@@ -1,1 +1,9 @@
 .npmrc
+
+# Negative-control mutants. They MUST be written inside lib/ for their relative
+# requires to resolve, and a committed one is a broken copy of a real module
+# living in the tree. The prepack guard refuses to PACKAGE them; this stops them
+# reaching a commit as well.
+.mut*
+lib/.mut*
+*.tgz

@@ -1,13 +1,14 @@
 {
   "name": "claude-bridge-cli",
-  "version": "2.12.1",
+  "version": "2.13.0",
   "description": "Use Claude Code from your browser. Runs a local server that connects your browser tools to the Claude CLI.",
   "main": "lib/bridge.js",
   "bin": {
     "claude-bridge-cli": "bin/cli.js"
   },
   "scripts": {
-    "start": "node bin/cli.js start"
+    "start": "node bin/cli.js start",
+    "prepack": "node scripts/verify-no-package-residue.mjs"
   },
   "repository": {
     "type": "git",
@@ -15,7 +16,11 @@
   },
   "files": [
     "bin/",
-    "lib/"
+    "lib/",
+    "!lib/.*",
+    "!bin/.*",
+    "!**/*.bak*",
+    "!**/*.tmp"
   ],
   "keywords": [
     "claude",
