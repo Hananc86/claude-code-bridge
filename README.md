@@ -68,6 +68,9 @@ All options can be set via CLI flags or environment variables:
 | `--token` | `BRIDGE_MACHINE_TOKEN` | — |
 | `--cf-id` | `BRIDGE_CF_ID` | — |
 | `--cf-secret` | `BRIDGE_CF_SECRET` | — |
+| — | `MISSION_CONTROL_TOKEN` | — (🎯 Mission Control project chip: this machine's per-actor board token; or write `~/.claude-bridge/mission-control.json` `{"url","token","board"}`) |
+| — | `MISSION_CONTROL_URL` | `https://plan-api.cohenscloud.com` |
+| — | `MISSION_CONTROL_BOARD` | `https://plan.cohenscloud.com/` |
 
 ## License
 
